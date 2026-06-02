@@ -6,9 +6,7 @@ import { getCurrentUser } from "@/lib/currentUser";
 const DEFAULT_COLUMNS = ["Backlog", "In progress", "Done"];
 
 export async function GET() {
-  const me = await getCurrentUser();
   const boards = await prisma.board.findMany({
-    where: { members: { some: { userId: me.id } } },
     orderBy: { createdAt: "asc" },
     select: { id: true, name: true, createdAt: true },
   });
