@@ -1,0 +1,233 @@
+// Mamamia Linear — Kanban for IT work
+// Schema is the single source of truth for the data model.
+// Conventions:
+//   - UUID primary keys
+//   - position is Float so we can insert between siblings without renumbering
+//   - cascade deletes flow board → column → card → checklist → item
+//   - Tags are scoped per board; checklist-item tags must belong to the
+//     parent card's board (enforced in lib/, not at DB level)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  email     String?  @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  boardMemberships    BoardMember[]
+  cardOwnerships      CardOwner[]
+  checklistOwnerships ChecklistItemOwner[]
+  comments            Comment[]
+  activities          Activity[]
+
+  @@map("users")
+}
+
+model Board {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  members BoardMember[]
+  columns Column[]
+  tags    Tag[]
+
+  @@map("boards")
+}
+
+model BoardMember {
+  boardId   String   @map("board_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([boardId, userId])
+  @@index([userId])
+  @@map("board_members")
+}
+
+model Column {
+  id       String @id @default(uuid()) @db.Uuid
+  boardId  String @map("board_id") @db.Uuid
+  name     String
+  position Float
+
+  board Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards Card[]
+
+  @@index([boardId, position])
+  @@map("columns")
+}
+
+model Card {
+  id              String    @id @default(uuid()) @db.Uuid
+  columnId        String    @map("column_id") @db.Uuid
+  title           String
+  descriptionHtml String?   @map("description_html")
+  dueDate         DateTime? @map("due_date")
+  position        Float
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  column     Column      @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  owners     CardOwner[]
+  tags       CardTag[]
+  checklists Checklist[]
+  comments   Comment[]
+  activities Activity[]
+
+  @@index([columnId, position])
+  @@map("cards")
+}
+
+model CardOwner {
+  cardId String @map("card_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, userId])
+  @@index([userId])
+  @@map("card_owners")
+}
+
+model Tag {
+  id      String  @id @default(uuid()) @db.Uuid
+  boardId String  @map("board_id") @db.Uuid
+  name    String
+  color   String?
+
+  board             Board              @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards             CardTag[]
+  checklistItemTags ChecklistItemTag[]
+
+  @@unique([boardId, name])
+  @@map("tags")
+}
+
+model CardTag {
+  cardId String @map("card_id") @db.Uuid
+  tagId  String @map("tag_id") @db.Uuid
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, tagId])
+  @@index([tagId])
+  @@map("card_tags")
+}
+
+model Checklist {
+  id       String @id @default(uuid()) @db.Uuid
+  cardId   String @map("card_id") @db.Uuid
+  title    String
+  position Float
+
+  card  Card            @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  items ChecklistItem[]
+
+  @@index([cardId, position])
+  @@map("checklists")
+}
+
+model ChecklistItem {
+  id          String    @id @default(uuid()) @db.Uuid
+  checklistId String    @map("checklist_id") @db.Uuid
+  title       String
+  description String?
+  dueDate     DateTime? @map("due_date")
+  completed   Boolean   @default(false)
+  position    Float
+
+  checklist Checklist            @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  owners    ChecklistItemOwner[]
+  tags      ChecklistItemTag[]
+
+  @@index([checklistId, position])
+  @@map("checklist_items")
+}
+
+model ChecklistItemOwner {
+  checklistItemId String @map("checklist_item_id") @db.Uuid
+  userId          String @map("user_id") @db.Uuid
+
+  item ChecklistItem @relation(fields: [checklistItemId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([checklistItemId, userId])
+  @@index([userId])
+  @@map("checklist_item_owners")
+}
+
+model ChecklistItemTag {
+  checklistItemId String @map("checklist_item_id") @db.Uuid
+  tagId           String @map("tag_id") @db.Uuid
+
+  item ChecklistItem @relation(fields: [checklistItemId], references: [id], onDelete: Cascade)
+  tag  Tag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([checklistItemId, tagId])
+  @@index([tagId])
+  @@map("checklist_item_tags")
+}
+
+model Comment {
+  id           String   @id @default(uuid()) @db.Uuid
+  cardId       String   @map("card_id") @db.Uuid
+  authorUserId String   @map("author_user_id") @db.Uuid
+  body         String
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  card   Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  @@index([cardId, createdAt])
+  @@map("comments")
+}
+
+enum ActivityType {
+  CARD_MOVED
+  CARD_MOVED_BOARD
+  OWNER_ADDED
+  OWNER_REMOVED
+  DATE_SET
+  DATE_CLEARED
+  TAG_ADDED
+  TAG_REMOVED
+  CHECKLIST_CREATED
+  CHECKLIST_DELETED
+  CHECKLIST_ITEM_ADDED
+  CHECKLIST_ITEM_REMOVED
+  CHECKLIST_ITEM_TOGGLED
+  CHECKLIST_ITEM_OWNER_ADDED
+  CHECKLIST_ITEM_OWNER_REMOVED
+  CHECKLIST_ITEM_DATE_SET
+  CHECKLIST_ITEM_DATE_CLEARED
+}
+
+model Activity {
+  id          String       @id @default(uuid()) @db.Uuid
+  cardId      String       @map("card_id") @db.Uuid
+  actorUserId String       @map("actor_user_id") @db.Uuid
+  type        ActivityType
+  payload     Json         @default("{}")
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  card  Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  actor User @relation(fields: [actorUserId], references: [id], onDelete: Cascade)
+
+  @@index([cardId, createdAt])
+  @@map("activities")
+}
