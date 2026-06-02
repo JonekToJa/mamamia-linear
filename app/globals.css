@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  height: 100%;
+  background: theme(colors.bg);
+  color: theme(colors.text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.prose-card a {
+  color: theme(colors.accent);
+  text-decoration: underline;
+}
+.prose-card p {
+  margin: 0 0 0.5rem 0;
+}
+.prose-card ul,
+.prose-card ol {
+  margin: 0 0 0.5rem 1.25rem;
+  list-style: revert;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: theme(colors.border);
+  border-radius: 6px;
+}
