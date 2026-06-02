@@ -16,7 +16,6 @@ export default async function BoardPage({
 
   const [boards, board] = await Promise.all([
     prisma.board.findMany({
-      where: { members: { some: { userId: me.id } } },
       orderBy: { createdAt: "asc" },
       select: { id: true, name: true },
     }),

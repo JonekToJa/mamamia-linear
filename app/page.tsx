@@ -8,7 +8,6 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const me = await getCurrentUser();
   const boards = await prisma.board.findMany({
-    where: { members: { some: { userId: me.id } } },
     orderBy: { createdAt: "asc" },
     select: { id: true, name: true },
   });
